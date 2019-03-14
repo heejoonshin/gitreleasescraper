@@ -58,7 +58,7 @@ func (L *Latest) CreateLatest() error {
 }
 func (L *Latest) UpdateLatest() error{
 	db := common.GetDB()
-	if err := db.Update(&L); err != nil{
+	if err := db.Model(&Latest{}).Update(&L); err != nil{
 		return nil
 	}
 	return nil

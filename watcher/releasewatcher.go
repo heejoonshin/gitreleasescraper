@@ -38,12 +38,13 @@ func New(_commandchan chan Repoinfo) *WatchRepo{
 	releasedata := releases.SeleteAll()
 	for _ ,val := range releasedata{
 		ret.releases.Set(val.Repo,val)
+		fmt.Println(val)
 	}
 	return ret
 
 }
 func (w *WatchRepo)Run(){
-	timer := time.NewTimer(1* time.Second)
+	timer := time.NewTicker(30 * time.Minute)
 	defer timer.Stop()
 	for {
 
@@ -52,6 +53,10 @@ func (w *WatchRepo)Run(){
 
 			w.add(repo)
 		case <-timer.C:
+			
+			
+			//timer = time.NewTimer(1 * time.Second)
+			//fmt.Println("run")
 			//fmt.Print(w.watchList.Len())
 
 			for repo:= range w.watchList.Iter(){
@@ -84,7 +89,9 @@ func (w *WatchRepo)Run(){
 				}
 
 			}
-			timer = time.NewTimer(30*time.Minute)
+			
+
+			
 
 		}
 	}
@@ -102,7 +109,7 @@ func (w *WatchRepo) add(info Repoinfo) {
 		temp.Setter(info.Owner,info.Repo)
 
 
-		w.watchList.Set(info.Repo,&temp)
+		w.watchList.Set(info.Repo,temp)
 		temp.RequestInfo()
 		newdata := model.Latest{Tag:temp.Tagname,PublishedAt:temp.PublishedAt,Repo:info.Repo,Url:temp.Url}
 		newdata.CreateLatest()
