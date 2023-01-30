@@ -1,11 +1,8 @@
 package common
 
 import (
-	"github.com/cornelk/hashmap"
-	"github.com/go-telegram-bot-api/telegram-bot-api"
+	"github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 var Bot *tgbotapi.BotAPI
-var ChatID hashmap.HashMap
-
-
+var ChatID = map[int64]interface{}{}

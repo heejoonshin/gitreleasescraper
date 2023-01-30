@@ -2,48 +2,57 @@ package watcher
 
 import (
 	"fmt"
-	"github.com/cornelk/hashmap"
+	"log"
+
 	"github.com/heejoonshin/gitbot/gitinfo"
 	"github.com/heejoonshin/gitbot/model"
-	"log"
+
 	"time"
 )
-type Repoinfo struct{
-	Owner string
-	Repo string
+
+var Commandchan = make(chan Repoinfo)
+var DelChan = make(chan Repoinfo)
+
+type Repoinfo struct {
+	Target string
+	Owner  string
+	Repo   string
 }
 
-type WatchRepo struct{
+func (r *Repoinfo) String() string {
+	return r.Owner + ":" + r.Repo
+}
 
-	watchList hashmap.HashMap
+type WatchRepo struct {
+	watchList   map[string]interface{}
 	commandchan chan Repoinfo
-	releases hashmap.HashMap
-
+	releases    map[string]interface{}
 }
-func New(_commandchan chan Repoinfo) *WatchRepo{
 
-	h := hashmap.HashMap{}
+func New(_commandchan chan Repoinfo) *WatchRepo {
+
+	h := map[string]interface{}{}
 	r := model.Repo{}
-	All :=r.SelectAll()
+	All := r.SelectAll()
 
-	for _,val := range All{
+	for _, val := range All {
 		temp := gitinfo.Latest{}
-		temp.Setter(val.Owner,val.Repo)
-		h.Set(val.Repo,temp)
+		temp.Setter(val.Owner, val.Repo)
+		h[temp.String()] = temp
 	}
 
-
-	ret := &WatchRepo{commandchan:_commandchan,watchList: h}
+	ret := &WatchRepo{commandchan: _commandchan, watchList: h, releases: map[string]interface{}{}}
 	releases := model.Latest{}
 	releasedata := releases.SeleteAll()
-	for _ ,val := range releasedata{
-		ret.releases.Set(val.Repo,val)
+
+	for _, val := range releasedata {
+		ret.releases[val.Repo] = val
 		fmt.Println(val)
 	}
 	return ret
 
 }
-func (w *WatchRepo)Run(){
+func (w *WatchRepo) Run() {
 	timer := time.NewTicker(30 * time.Minute)
 	defer timer.Stop()
 	for {
@@ -53,71 +62,72 @@ func (w *WatchRepo)Run(){
 
 			w.add(repo)
 		case <-timer.C:
-			
-			
+
 			//timer = time.NewTimer(1 * time.Second)
 			//fmt.Println("run")
 			//fmt.Print(w.watchList.Len())
+			timer.Reset(30 * time.Minute)
 
-			for repo:= range w.watchList.Iter(){
+			for key, repo := range w.watchList {
 
-				x ,ok := repo.Value.(gitinfo.Latest)
-				if !ok{
+				x, ok := repo.(gitinfo.Latest)
+				if !ok {
 					continue
 				}
 				x.RequestInfo()
 
-				r := repo.Key.(string)
+				r := key
 				fmt.Println(r)
-				newdata := model.Latest{Tag:x.Tagname,PublishedAt:x.PublishedAt,Repo:r,Url:x.Url}
-				fmt.Println("ttt:",newdata)
+				newdata := model.Latest{Tag: x.Tagname, PublishedAt: x.PublishedAt, Repo: r, Url: x.Url, Id: x.String()}
+				fmt.Println("ttt:", newdata)
 
-				if release,ok := w.releases.Get(r); !ok{
+				if release, ok := w.releases[r]; !ok {
 
 					newdata.CreateLatest()
-					w.releases.Set(r,newdata)
+					w.releases[r] = newdata
 
-
-
-				}else{
+				} else {
 					data := release.(model.Latest)
 					if data.Tag != newdata.Tag && newdata.Tag != "" {
 						newdata.UpdateLatest()
-						w.releases.Set(r,newdata)
+						w.releases[r] = newdata
 
 					}
 				}
 
 			}
-			
-
-			
+		case repo := <-DelChan:
+			w.del(repo)
 
 		}
 	}
 
 }
 
-
-
 func (w *WatchRepo) add(info Repoinfo) {
 
-	if _,ok :=w.watchList.Get(info.Repo); !ok{
+	if _, ok := w.watchList[info.String()]; !ok {
 
-		repo := &model.Repo{Owner:info.Owner,Repo:info.Repo}
+		repo := &model.Repo{Target: info.Target, Owner: info.Owner, Repo: info.Repo}
 		temp := gitinfo.Latest{}
-		temp.Setter(info.Owner,info.Repo)
+		temp.Setter(info.Owner, info.Repo)
 
-
-		w.watchList.Set(info.Repo,temp)
+		w.watchList[temp.String()] = temp
 		temp.RequestInfo()
-		newdata := model.Latest{Tag:temp.Tagname,PublishedAt:temp.PublishedAt,Repo:info.Repo,Url:temp.Url}
+		newdata := model.Latest{Tag: temp.Tagname, PublishedAt: temp.PublishedAt, Repo: info.Repo, Url: temp.Url, Id: temp.String()}
 		newdata.CreateLatest()
-		w.releases.Set(info.Repo,newdata)
+		w.releases[newdata.Id] = newdata
 		repo.CreateData()
 
-	}else{
+	} else {
 		log.Print("already watched")
 	}
 }
 
+func (w *WatchRepo) del(info Repoinfo) {
+
+	if _, ok := w.watchList[info.String()]; ok {
+		delete(w.watchList, info.String())
+	}
+
+}

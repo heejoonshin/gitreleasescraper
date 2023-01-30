@@ -2,13 +2,18 @@ package common
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 )
 
-func GetJSON(url string,json_map interface{}) error {
+func GetJSON(url string, json_map interface{}) error {
 	resp, err := http.Get(url)
+
+	if resp.StatusCode != 200 {
+		return errors.New("데이터를 불러오지 못했습니다")
+	}
 	if err != nil {
-		panic(err)
+		return err
 	}
 	defer resp.Body.Close()
 
@@ -16,7 +21,7 @@ func GetJSON(url string,json_map interface{}) error {
 
 	dec := json.NewDecoder(resp.Body)
 	if dec == nil {
-		panic("Failed to start decoding JSON data")
+		return errors.New("Failed to start decoding JSON data")
 	}
 
 	//json_map := make(map[string]interface{})
@@ -25,7 +30,6 @@ func GetJSON(url string,json_map interface{}) error {
 		panic(err)
 	}
 	//fmt.Println(json_map["tag_name"])
-
 
 	//fmt.Printf("%v\n", json_map)
 	return nil
